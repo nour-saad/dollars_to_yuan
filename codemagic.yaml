@@ -35,10 +35,10 @@ workflows:
       # Pin to stable so the cloud Mac matches your local engine.
       flutter: stable
       xcode: latest
-      # Pin a modern CocoaPods so the newer Flutter podhelper API
-      # (flutter_install_all_ios_pods / flutter_additional_ios_build_settings)
-      # resolves. "default" on Codemagic is often too old for Flutter >= 3.24.
-      cocoapods: 1.16.2
+      # Do NOT pin cocoapods at the environment level: Codemagic's current macOS
+      # image defaults to Ruby 4.0, where xcodeproj 1.27.0 crashes on the
+      # "unknown ISA XCConfigurationList" error. The Install CocoaPods script
+      # below switches to Ruby 3.x and installs a compatible CocoaPods.
       vars:
         # The bundle ID registered in the Apple Developer portal (must match
         # ios/Runner.xcodeproj/project.pbxproj exactly). Change in BOTH places.
@@ -58,10 +58,18 @@ workflows:
 
       - name: Install CocoaPods
         # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
-        # No --repo-update: the cloud specs cache is fresh and it avoids a slow,
-        # fragile network refresh that fails fast on transient errors.
+        # WORKAROUND: the macOS build image's default Ruby is 4.0, where
+        # xcodeproj 1.27.0 fails with "unknown ISA XCConfigurationList". Switch
+        # to a Ruby 3.x (xcodeproj-compatible) and install CocoaPods there.
         script: |
           cd ios
+          export PATH="$HOME/.rbenv/shims:$HOME/.rbenv/bin:$PATH"
+          eval "$(rbenv init -)" 2>/dev/null || true
+          for v in 3.3.4 3.3.0 3.2.3 3.1.4 3.0.6; do
+            if rbenv global "$v" 2>/dev/null; then echo "Selected Ruby $v"; break; fi
+          done
+          ruby --version
+          gem install cocoapods -v 1.15.2 --no-document 2>&1 | tail -3
           pod install
 
       - name: Static analysis
