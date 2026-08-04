@@ -35,7 +35,10 @@ workflows:
       # Pin to stable so the cloud Mac matches your local engine.
       flutter: stable
       xcode: latest
-      cocoapods: default
+      # Pin a modern CocoaPods so the newer Flutter podhelper API
+      # (flutter_install_all_ios_pods / flutter_additional_ios_build_settings)
+      # resolves. "default" on Codemagic is often too old for Flutter >= 3.24.
+      cocoapods: 1.16.2
       vars:
         # The bundle ID registered in the Apple Developer portal (must match
         # ios/Runner.xcodeproj/project.pbxproj exactly). Change in BOTH places.
@@ -55,9 +58,11 @@ workflows:
 
       - name: Install CocoaPods
         # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
+        # No --repo-update: the cloud specs cache is fresh and it avoids a slow,
+        # fragile network refresh that fails fast on transient errors.
         script: |
           cd ios
-          pod install --repo-update
+          pod install
 
       - name: Static analysis
         script: flutter analyze
