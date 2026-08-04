@@ -1,0 +1,30 @@
+name: dollars_to_yuan
+description: A clean, modern currency converter for USD and CNY.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  flutter_riverpod: ^2.5.1
+  dio: ^5.4.3+1
+  shared_preferences: ^2.2.3
+  google_mobile_ads: ^9.0.0
+  app_tracking_transparency: ^2.0.0
+  purchases_flutter: ^10.7.0
+  intl: ^0.20.2
+  google_fonts: ^8.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

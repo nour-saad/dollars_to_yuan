@@ -1,0 +1,100 @@
+# =============================================================================
+# Codemagic CI for dollars_to_yuan — builds & ships iOS WITHOUT a local Mac.
+#
+# How this works (no Mac needed on your side):
+#   1. You push this repo to GitHub.
+#   2. Codemagic (cloud Mac) runs: flutter pub get -> pod install -> analyze
+#      -> test -> fetch signing -> build IPA -> upload to App Store Connect.
+#   3. The IPA lands in TestFlight; you install it on your iPhone to verify
+#      ads + RevenueCat premium before submitting for review.
+#
+# Prereqs (set up once, in the Codemagic web UI — see IOS_RELEASE_GUIDE.md):
+#   - Connect your GitHub repo.
+#   - Add the "App Store Connect" API integration (gives the APP_STORE_CONNECT_*
+#     vars automatically). Your friend's paid Apple Developer account is used here.
+#   - In the workflow's "Environment > App Store Connect" pick that integration
+#     and enable "Automatic code signing". Codemagic then auto-creates the
+#     Distribution certificate + App Store provisioning profile for the bundle ID.
+# =============================================================================
+
+workflows:
+  dollars_to_yuan_ios:
+    name: Dollars To Yuan — iOS
+    # mac_mini_m1 is the free-tier macOS instance on Codemagic.
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    # Build only when you push to the branch you release from.
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+
+    environment:
+      # Pin to stable so the cloud Mac matches your local engine.
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        # The bundle ID registered in the Apple Developer portal (must match
+        # ios/Runner.xcodeproj/project.pbxproj exactly). Change in BOTH places.
+        APP_STORE_CONNECT_BUNDLE_ID: "com.wcs.DollarsToYuan"
+        XCODE_PROJECT: "ios/Runner.xcodeproj"
+        XCODE_SCHEME: "Runner"
+      # The following are injected by the App Store Connect API integration you
+      # configure in the Codemagic UI (do NOT hard-code secrets here):
+      #   APP_STORE_CONNECT_KEY_IDENTIFIER
+      #   APP_STORE_CONNECT_ISSUER_ID
+      #   APP_STORE_CONNECT_PRIVATE_KEY
+      #   CM_CERTIFICATE_PRIVATE_KEY   (auto, when automatic signing is on)
+
+    scripts:
+      - name: Fetch Flutter dependencies
+        script: flutter pub get
+
+      - name: Install CocoaPods
+        # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
+        script: |
+          cd ios
+          pod install --repo-update
+
+      - name: Static analysis
+        script: flutter analyze
+
+      - name: Unit tests
+        script: flutter test
+
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$APP_STORE_CONNECT_BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --api-key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --api-issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --certificate-key "$CM_CERTIFICATE_PRIVATE_KEY"
+          keychain add-certificates
+
+      - name: Build iOS IPA (release)
+        script: |
+          flutter build ipa --release \
+            --export-options-plist="$CM_EXPORT_OPTIONS_PATH"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - # add your email here to get build-pass/fail notifications
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        # Uploads the IPA to App Store Connect and pushes it to TestFlight.
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
