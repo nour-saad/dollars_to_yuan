@@ -35,10 +35,10 @@ workflows:
       # Pin to stable so the cloud Mac matches your local engine.
       flutter: stable
       xcode: latest
-      # CocoaPods version is NOT pinned here on purpose. The macOS image's Ruby
-      # 4.0 / Ruby 3.4 both break xcodeproj 1.27.0 (-> "unknown ISA XCConfigurationList"
-      # on our pbxproj). The Install CocoaPods step builds a self-contained,
-      # known-good toolchain (Ruby 3.3 + CocoaPods 1.13.0) and uses it directly.
+      # CocoaPods is NOT pinned here. The macOS image's Ruby 4.0 / 3.4 both break
+      # xcodeproj 1.27.0 (-> "unknown ISA XCConfigurationList" on our pbxproj).
+      # The Install CocoaPods step builds a self-contained Ruby 3.3.0 + CocoaPods
+      # 1.13.0 toolchain and calls its binaries by absolute path.
       vars:
         # The bundle ID registered in the Apple Developer portal (must match
         # ios/Runner.xcodeproj/project.pbxproj exactly). Change in BOTH places.
@@ -57,30 +57,26 @@ workflows:
         script: flutter pub get
 
       - name: Install CocoaPods
-        # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
-        # The image's system CocoaPods (Ruby 4.0 / 3.4 + xcodeproj 1.27.0) crashes
-        # with "unknown ISA XCConfigurationList" on our project.pbxproj. So we
-        # build a self-contained toolchain: Ruby 3.3 + CocoaPods 1.13.0
-        # (xcodeproj ~1.22, which parses objectVersion 54 cleanly), and run that
-        # pod binary explicitly. If 3.3 isn't installed, rbenv downloads it.
+        # The image's system CocoaPods (Ruby 4.0 or 3.4 + xcodeproj 1.27.0) crashes
+        # with "unknown ISA XCConfigurationList" on our project.pbxproj. We build a
+        # self-contained toolchain: Ruby 3.3.0 + CocoaPods 1.13.0 (xcodeproj ~1.22,
+        # which parses objectVersion 54 cleanly). We invoke the 3.3.0 binaries by
+        # ABSOLUTE PATH because rbenv's `global`/shim activation is unreliable inside
+        # Codemagic's non-interactive script runner (it kept resolving to Ruby 4.0.2,
+        # so gem installed into the wrong Ruby and the 3.3.0 pod bin was never made).
         script: |
           cd ios
-          export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
-          eval "$(rbenv init - bash)" 2>/dev/null || true
-          RUBY3=$(rbenv versions --bare 2>/dev/null | grep -E '^3\.[0-3]\.' | sort -V | head -1)
-          if [ -z "$RUBY3" ]; then
-            echo "No Ruby 3.0-3.3 found; installing 3.3.0 (one-time)..."
-            rbenv install 3.3.0 || { echo "rbenv install failed. Installed rubies:"; rbenv versions; exit 1; }
-            RUBY3=3.3.0
+          RUBY33="$HOME/.rbenv/versions/3.3.0"
+          if [ ! -x "$RUBY33/bin/ruby" ]; then
+            export PATH="$HOME/.rbenv/bin:$PATH"
+            echo "Installing Ruby 3.3.0 (one-time)..."
+            rbenv install 3.3.0 || { echo "rbenv install failed"; exit 1; }
           fi
-          rbenv global "$RUBY3"
-          rbenv rehash
-          echo "Using Ruby $(ruby -v)"
-          gem install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
-          rbenv rehash
-          PODBIN="$HOME/.rbenv/versions/$RUBY3/bin/pod"
-          echo "pod: $($PODBIN --version)"
-          "$PODBIN" install
+          export PATH="$RUBY33/bin:$PATH"
+          echo "Using Ruby $($RUBY33/bin/ruby -v)"
+          "$RUBY33/bin/gem" install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
+          echo "pod: $("$RUBY33/bin/pod" --version)"
+          "$RUBY33/bin/pod" install
 
       - name: Static analysis
         script: flutter analyze
