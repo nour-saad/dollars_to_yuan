@@ -88,7 +88,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - # add your email here to get build-pass/fail notifications
+          - nouraldeen.saad@gmail.com
         notify:
           success: true
           failure: true
