@@ -63,14 +63,21 @@ workflows:
         # to a Ruby 3.x (xcodeproj-compatible) and install CocoaPods there.
         script: |
           cd ios
-          export PATH="$HOME/.rbenv/shims:$HOME/.rbenv/bin:$PATH"
-          eval "$(rbenv init -)" 2>/dev/null || true
-          for v in 3.3.4 3.3.0 3.2.3 3.1.4 3.0.6; do
-            if rbenv global "$v" 2>/dev/null; then echo "Selected Ruby $v"; break; fi
-          done
-          ruby --version
+          export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
+          eval "$(rbenv init - bash)" 2>/dev/null || true
+          # Dynamically pick ANY installed Ruby 3.x (xcodeproj 1.27.0 is broken on Ruby 4.0).
+          RUBY3=$(rbenv versions --bare 2>/dev/null | grep -E '^3\.' | sort -V | head -1)
+          if [ -z "$RUBY3" ]; then
+            echo "ERROR: no Ruby 3.x found. Installed rubies:"; rbenv versions
+            exit 1
+          fi
+          rbenv global "$RUBY3"
+          rbenv rehash
+          echo "Using Ruby $(ruby -v) (was Ruby 4.0 -> xcodeproj crash)"
           gem install cocoapods -v 1.15.2 --no-document 2>&1 | tail -3
-          pod install
+          rbenv rehash
+          PODBIN="$HOME/.rbenv/versions/$RUBY3/bin/pod"
+          "$PODBIN" install
 
       - name: Static analysis
         script: flutter analyze
