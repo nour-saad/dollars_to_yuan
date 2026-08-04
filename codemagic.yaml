@@ -35,11 +35,10 @@ workflows:
       # Pin to stable so the cloud Mac matches your local engine.
       flutter: stable
       xcode: latest
-      # Pin CocoaPods 1.15.2: it bundles xcodeproj 1.24.0, which correctly
-      # parses the project.pbxproj (objectVersion 54). Newer CocoaPods 1.16.x
-      # ships xcodeproj 1.27.0, which crashes with "unknown ISA XCConfigurationList"
-      # on this pbxproj. Do NOT bump this past 1.15.x.
-      cocoapods: 1.15.2
+      # CocoaPods version is NOT pinned here on purpose. The macOS image's Ruby
+      # 4.0 / Ruby 3.4 both break xcodeproj 1.27.0 (-> "unknown ISA XCConfigurationList"
+      # on our pbxproj). The Install CocoaPods step builds a self-contained,
+      # known-good toolchain (Ruby 3.3 + CocoaPods 1.13.0) and uses it directly.
       vars:
         # The bundle ID registered in the Apple Developer portal (must match
         # ios/Runner.xcodeproj/project.pbxproj exactly). Change in BOTH places.
@@ -59,12 +58,29 @@ workflows:
 
       - name: Install CocoaPods
         # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
-        # The cocoapods version is pinned in `environment` (1.15.2 -> xcodeproj
-        # 1.24.0, which parses this pbxproj). No --repo-update: the cloud specs
-        # cache is fresh.
+        # The image's system CocoaPods (Ruby 4.0 / 3.4 + xcodeproj 1.27.0) crashes
+        # with "unknown ISA XCConfigurationList" on our project.pbxproj. So we
+        # build a self-contained toolchain: Ruby 3.3 + CocoaPods 1.13.0
+        # (xcodeproj ~1.22, which parses objectVersion 54 cleanly), and run that
+        # pod binary explicitly. If 3.3 isn't installed, rbenv downloads it.
         script: |
           cd ios
-          pod install
+          export PATH="$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH"
+          eval "$(rbenv init - bash)" 2>/dev/null || true
+          RUBY3=$(rbenv versions --bare 2>/dev/null | grep -E '^3\.[0-3]\.' | sort -V | head -1)
+          if [ -z "$RUBY3" ]; then
+            echo "No Ruby 3.0-3.3 found; installing 3.3.0 (one-time)..."
+            rbenv install 3.3.0 || { echo "rbenv install failed. Installed rubies:"; rbenv versions; exit 1; }
+            RUBY3=3.3.0
+          fi
+          rbenv global "$RUBY3"
+          rbenv rehash
+          echo "Using Ruby $(ruby -v)"
+          gem install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
+          rbenv rehash
+          PODBIN="$HOME/.rbenv/versions/$RUBY3/bin/pod"
+          echo "pod: $($PODBIN --version)"
+          "$PODBIN" install
 
       - name: Static analysis
         script: flutter analyze
