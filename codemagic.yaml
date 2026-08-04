@@ -76,10 +76,11 @@ workflows:
           echo "Using Ruby $($RUBY33/bin/ruby -v)"
           # Pin a COMPATIBLE toolchain for our project.pbxproj (objectVersion 54):
           # - activesupport 7.0.8 : CocoaPods 1.13.0 calls #present? which crashes on 7.1+
-          # - xcodeproj 1.25.0    : 1.27/1.28 cannot parse objectVersion 54 ("unknown ISA XCConfigurationList")
-          # Install these BEFORE cocoapods so its dependency resolver uses them.
+          # - xcodeproj 1.22.0    : the proven-good version for objectVersion 54.
+          #                        1.27/1.28 fail to parse it ("unknown ISA XCConfigurationList");
+          #                        1.25.0 parses but hits a type-checking regression. 1.22.0 works.
           "$RUBY33/bin/gem" install activesupport -v 7.0.8 --no-document 2>&1 | tail -2
-          "$RUBY33/bin/gem" install xcodeproj -v 1.25.0 --no-document 2>&1 | tail -2
+          "$RUBY33/bin/gem" install xcodeproj -v 1.22.0 --no-document 2>&1 | tail -2
           "$RUBY33/bin/gem" install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
           echo "pod: $("$RUBY33/bin/pod" --version)"
           "$RUBY33/bin/pod" install
