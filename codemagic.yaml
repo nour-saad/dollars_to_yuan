@@ -74,9 +74,12 @@ workflows:
           fi
           export PATH="$RUBY33/bin:$PATH"
           echo "Using Ruby $($RUBY33/bin/ruby -v)"
-          # Pin activesupport < 7.1: CocoaPods 1.13.0 calls ActiveSupport#present?
-          # which raises "undefined method `present?' for nil" under activesupport 7.1+.
+          # Pin a COMPATIBLE toolchain for our project.pbxproj (objectVersion 54):
+          # - activesupport 7.0.8 : CocoaPods 1.13.0 calls #present? which crashes on 7.1+
+          # - xcodeproj 1.25.0    : 1.27/1.28 cannot parse objectVersion 54 ("unknown ISA XCConfigurationList")
+          # Install these BEFORE cocoapods so its dependency resolver uses them.
           "$RUBY33/bin/gem" install activesupport -v 7.0.8 --no-document 2>&1 | tail -2
+          "$RUBY33/bin/gem" install xcodeproj -v 1.25.0 --no-document 2>&1 | tail -2
           "$RUBY33/bin/gem" install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
           echo "pod: $("$RUBY33/bin/pod" --version)"
           "$RUBY33/bin/pod" install
