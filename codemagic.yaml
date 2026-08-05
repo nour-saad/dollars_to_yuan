@@ -33,13 +33,12 @@ workflows:
 
     environment:
       # Pin to stable so the cloud Mac matches your local engine.
-      flutter: stable
-      # Pin Xcode 15.4 (NOT "latest"). The Xcode 17 / Ruby 4.0 image ships a
-      # CocoaPods/xcodeproj that cannot parse this Flutter pbxproj (objectVersion 54)
-      # -> "unknown ISA XCConfigurationList". The Xcode 15.4 image ships an older
-      # Ruby (3.0/3.1) + CocoaPods 1.13/1.14 + xcodeproj that parses it cleanly,
-      # so a plain `pod install` works. This is the standard Codemagic fix.
-      xcode: "15.4"
+      # Pin to stable so the cloud Mac matches your local engine.
+      # xcode "latest" ships CocoaPods/xcodeproj 1.27/1.28, which CAN parse this
+      # (now clean) pbxproj's objectVersion 54. The earlier "unknown ISA XCConfigurationList"
+      # failures were caused by a CORRUPTED pbxproj (a UUID collision where 97C14705 was
+      # both an XCConfigurationList and a buildConfiguration); that is now regenerated.
+      xcode: latest
       vars:
         # The bundle ID registered in the Apple Developer portal (must match
         # ios/Runner.xcodeproj/project.pbxproj exactly). Change in BOTH places.
