@@ -74,11 +74,15 @@ workflows:
           export PATH="$RUBY33/bin:$PATH"
           echo "Using Ruby $($RUBY33/bin/ruby -v)"
           # One gem install per call (can't combine -v with multiple gems).
+          # xcodeproj: pin 1.26.0. CocoaPods 1.13.0 needs xcodeproj >= 1.23.0, and
+          # 1.27/1.28 are the broken ones (can't parse our pbxproj -> "unknown ISA
+          # XCConfigurationList"). 1.26.0 satisfies both. We uninstall any xcodeproj
+          # >1.26.0 so RubyGems loads 1.26.0 (it otherwise picks the newest 1.28.1).
+          # activesupport 7.0.8: CocoaPods 1.13.0's #present? crashes on 7.1+.
           "$RUBY33/bin/gem" install activesupport -v 7.0.8 --no-document 2>&1 | tail -2
-          "$RUBY33/bin/gem" install xcodeproj -v 1.22.0 --no-document 2>&1 | tail -2
+          "$RUBY33/bin/gem" install xcodeproj -v 1.26.0 --no-document 2>&1 | tail -2
           "$RUBY33/bin/gem" install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
-          # Remove any NEWER xcodeproj so RubyGems loads 1.22.0 (it otherwise picks newest).
-          "$RUBY33/bin/gem" uninstall xcodeproj -v '>1.22.0' --force --ignore-dependencies 2>&1 | tail -2
+          "$RUBY33/bin/gem" uninstall xcodeproj -v '>1.26.0' --force --ignore-dependencies 2>&1 | tail -2
           echo "xcodeproj: $("$RUBY33/bin/gem" list xcodeproj | grep xcodeproj)"
           echo "pod: $("$RUBY33/bin/pod" --version)"
           "$RUBY33/bin/pod" install
