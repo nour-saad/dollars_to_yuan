@@ -52,6 +52,7 @@ workflows:
       # the App Store Connect API integration you added in the Codemagic UI.
       ios_signing:
         distribution_type: app_store        # -> App Store / TestFlight
+        bundle_id: com.wcs.DollarsToYuan    # must match pbxproj + App Store Connect
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
