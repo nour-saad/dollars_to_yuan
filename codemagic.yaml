@@ -74,16 +74,17 @@ workflows:
           fi
           export PATH="$RUBY33/bin:$PATH"
           echo "Using Ruby $($RUBY33/bin/ruby -v)"
-          # Pin a COMPATIBLE toolchain for our project.pbxproj (objectVersion 54):
-          # - activesupport 7.0.8 : CocoaPods 1.13.0 calls #present? which crashes on 7.1+
-          # - xcodeproj 1.22.0    : the proven-good version for objectVersion 54.
-          #                        1.27/1.28 fail to parse it ("unknown ISA XCConfigurationList");
-          #                        1.25.0 parses but hits a type-checking regression. 1.22.0 works.
-          "$RUBY33/bin/gem" install activesupport -v 7.0.8 --no-document 2>&1 | tail -2
-          "$RUBY33/bin/gem" install xcodeproj -v 1.22.0 --no-document 2>&1 | tail -2
-          "$RUBY33/bin/gem" install cocoapods -v 1.13.0 --no-document 2>&1 | tail -3
-          echo "pod: $("$RUBY33/bin/pod" --version)"
-          "$RUBY33/bin/pod" install
+          # Use Bundler to LOCK the toolchain. Simply `gem install xcodeproj -v 1.22.0`
+          # is not enough: when both 1.22.0 and the newer 1.28.1 are present, RubyGems
+          # loads the NEWEST, so pod still crashed on xcodeproj 1.28.1. A Gemfile forces 1.22.0.
+          #   - xcodeproj 1.22.0  : only version that parses our objectVersion 54 pbxproj
+          #                         (1.27/1.28 -> unknown ISA; 1.25.0 -> type-check regression)
+          #   - activesupport 7.0.8 : CocoaPods 1.13.0's #present? crashes on 7.1+
+          "$RUBY33/bin/gem" install bundler --no-document 2>&1 | tail -1
+          printf 'source "https://rubygems.org"\ngem "cocoapods", "1.13.0"\ngem "xcodeproj", "1.22.0"\ngem "activesupport", "7.0.8"\n' > Gemfile
+          "$RUBY33/bin/bundle" install 2>&1 | tail -6
+          echo "pod: $("$RUBY33/bin/bundle" exec pod --version)"
+          "$RUBY33/bin/bundle" exec pod install
 
       - name: Static analysis
         script: flutter analyze
