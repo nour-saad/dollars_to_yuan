@@ -57,14 +57,27 @@ workflows:
         script: flutter pub get
 
       - name: Install CocoaPods
-        # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
-        # The pbxproj uses objectVersion 48 (Xcode 13 era) so Codemagic's default
-        # CocoaPods/xcodeproj (which crashes on the stock Flutter objectVersion 54
-        # with "unknown ISA XCConfigurationList") parses it cleanly. No --repo-update
-        # needed; the cloud specs cache is fresh.
+        # REQUIRED: use Ruby 3.3.0. xcodeproj (used by CocoaPods) has a bug on Ruby 4.0
+        # (the image default) where its ISA registry fails -> "unknown ISA XCConfigurationList"
+        # on the first pbxproj object. Ruby 3.3 avoids that. We install the toolchain into
+        # Ruby 3.3.0 and call its `pod` by absolute path. CocoaPods 1.13.0 + activesupport 7.0.8
+        # + xcodeproj 1.22.0 is the known-good stack; we then UNINSTALL any newer xcodeproj
+        # (>1.22.0) so RubyGems loads 1.22.0 (it otherwise picks the newest installed).
         script: |
           cd ios
-          pod install
+          RUBY33="$HOME/.rbenv/versions/3.3.0"
+          if [ ! -x "$RUBY33/bin/ruby" ]; then
+            export PATH="$HOME/.rbenv/bin:$PATH"
+            echo "Installing Ruby 3.3.0 (one-time)..."
+            rbenv install 3.3.0 || { echo "rbenv install failed"; exit 1; }
+          fi
+          export PATH="$RUBY33/bin:$PATH"
+          echo "Using Ruby $($RUBY33/bin/ruby -v)"
+          "$RUBY33/bin/gem" install cocoapods -v 1.13.0 activesupport -v 7.0.8 xcodeproj -v 1.22.0 --no-document 2>&1 | tail -4
+          "$RUBY33/bin/gem" uninstall xcodeproj -v '>1.22.0' --force --ignore-dependencies 2>&1 | tail -2
+          echo "xcodeproj: $("$RUBY33/bin/gem" list xcodeproj | grep xcodeproj)"
+          echo "pod: $("$RUBY33/bin/pod" --version)"
+          "$RUBY33/bin/pod" install
 
       - name: Static analysis
         script: flutter analyze
