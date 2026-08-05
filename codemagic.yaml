@@ -12,9 +12,9 @@
 #   - Connect your GitHub repo.
 #   - Add the "App Store Connect" API integration (gives the APP_STORE_CONNECT_*
 #     vars automatically). Your friend's paid Apple Developer account is used here.
-#   - In the workflow's "Environment > App Store Connect" pick that integration
-#     and enable "Automatic code signing". Codemagic then auto-creates the
-#     Distribution certificate + App Store provisioning profile for the bundle ID.
+#   - Automatic signing is DECLARED IN THIS FILE under environment.ios_signing
+#     (no UI toggle needed). Codemagic auto-creates the Distribution certificate
+#     + App Store provisioning profile for the bundle ID.
 # =============================================================================
 
 workflows:
@@ -33,7 +33,6 @@ workflows:
 
     environment:
       # Pin to stable so the cloud Mac matches your local engine.
-      # Pin to stable so the cloud Mac matches your local engine.
       # xcode "latest" ships CocoaPods/xcodeproj 1.27/1.28, which CAN parse this
       # (now clean) pbxproj's objectVersion 54. The earlier "unknown ISA XCConfigurationList"
       # failures were caused by a CORRUPTED pbxproj (a UUID collision where 97C14705 was
@@ -45,12 +44,17 @@ workflows:
         APP_STORE_CONNECT_BUNDLE_ID: "com.wcs.DollarsToYuan"
         XCODE_PROJECT: "ios/Runner.xcodeproj"
         XCODE_SCHEME: "Runner"
-      # The following are injected by the App Store Connect API integration you
-      # configure in the Codemagic UI (do NOT hard-code secrets here):
-      #   APP_STORE_CONNECT_KEY_IDENTIFIER
-      #   APP_STORE_CONNECT_ISSUER_ID
-      #   APP_STORE_CONNECT_PRIVATE_KEY
-      #   CM_CERTIFICATE_PRIVATE_KEY   (auto, when automatic signing is on)
+      # ---- iOS AUTOMATIC CODE SIGNING (declared here, no UI toggle needed) ----------
+      # Codemagic reads this block, authenticates with the App Store Connect API key,
+      # auto-creates the Distribution certificate + App Store provisioning profile for
+      # the bundle ID, and exposes $CM_CERTIFICATE_PRIVATE_KEY / $CM_PROVISIONING_PROFILE /
+      # $CM_EXPORT_OPTIONS_PATH. The three APP_STORE_CONNECT_* vars below are injected by
+      # the App Store Connect API integration you added in the Codemagic UI.
+      ios_signing:
+        distribution_type: app_store        # -> App Store / TestFlight
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
 
     scripts:
       - name: Fetch Flutter dependencies
@@ -58,8 +62,8 @@ workflows:
 
       - name: Install CocoaPods
         # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
-        # With xcode "15.4" the image's default CocoaPods parses our pbxproj, so a
-        # plain pod install is enough. No --repo-update (cloud specs cache is fresh).
+        # With xcode "latest" the image's default CocoaPods parses our (now clean)
+        # pbxproj, so a plain pod install is enough. No --repo-update needed.
         script: |
           cd ios
           pod install
@@ -74,18 +78,9 @@ workflows:
       - name: Unit tests
         script: flutter test
 
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$APP_STORE_CONNECT_BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create \
-            --api-key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --api-issuer "$APP_STORE_CONNECT_ISSUER_ID" \
-            --certificate-key "$CM_CERTIFICATE_PRIVATE_KEY"
-          keychain add-certificates
-
       - name: Build iOS IPA (release)
+        # ios_signing (above) has already created the cert + provisioning profile
+        # and exported them to $CM_EXPORT_OPTIONS_PATH.
         script: |
           flutter build ipa --release \
             --export-options-plist="$CM_EXPORT_OPTIONS_PATH"
