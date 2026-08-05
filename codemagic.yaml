@@ -44,18 +44,15 @@ workflows:
         APP_STORE_CONNECT_BUNDLE_ID: "com.wcs.DollarsToYuan"
         XCODE_PROJECT: "ios/Runner.xcodeproj"
         XCODE_SCHEME: "Runner"
-      # ---- iOS AUTOMATIC CODE SIGNING (declared here, no UI toggle needed) ----------
-      # Codemagic reads this block, authenticates with the App Store Connect API key,
-      # auto-creates the Distribution certificate + App Store provisioning profile for
-      # the bundle ID, and exposes $CM_CERTIFICATE_PRIVATE_KEY / $CM_PROVISIONING_PROFILE /
-      # $CM_EXPORT_OPTIONS_PATH. The three APP_STORE_CONNECT_* vars below are injected by
-      # the App Store Connect API integration you added in the Codemagic UI.
+      # ---- iOS AUTOMATIC CODE SIGNING (declared here) -------------------------------
+      # Codemagic reads this block and, using the App Store Connect API integration
+      # linked in the app's Settings (app -> Settings -> Integrations -> App Store
+      # Connect), auto-creates the Distribution certificate + App Store provisioning
+      # profile for the bundle ID, then exposes $CM_CERTIFICATE_PRIVATE_KEY /
+      # $CM_PROVISIONING_PROFILE / $CM_EXPORT_OPTIONS_PATH for the build step.
       ios_signing:
-        distribution_type: app_store        # -> App Store / TestFlight
+        distribution_type: app_store          # -> App Store / TestFlight
         bundle_identifier: com.wcs.DollarsToYuan    # must match pbxproj + App Store Connect
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
 
     scripts:
       - name: Fetch Flutter dependencies
