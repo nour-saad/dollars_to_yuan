@@ -57,34 +57,14 @@ workflows:
         script: flutter pub get
 
       - name: Install CocoaPods
-        # The image's system CocoaPods (Ruby 4.0 or 3.4 + xcodeproj 1.27.0) crashes
-        # with "unknown ISA XCConfigurationList" on our project.pbxproj. We build a
-        # self-contained toolchain: Ruby 3.3.0 + CocoaPods 1.13.0 (xcodeproj ~1.22,
-        # which parses objectVersion 54 cleanly). We invoke the 3.3.0 binaries by
-        # ABSOLUTE PATH because rbenv's `global`/shim activation is unreliable inside
-        # Codemagic's non-interactive script runner (it kept resolving to Ruby 4.0.2,
-        # so gem installed into the wrong Ruby and the 3.3.0 pod bin was never made).
+        # The ios/Podfile is required for google_mobile_ads & purchases_flutter.
+        # The pbxproj uses objectVersion 48 (Xcode 13 era) so Codemagic's default
+        # CocoaPods/xcodeproj (which crashes on the stock Flutter objectVersion 54
+        # with "unknown ISA XCConfigurationList") parses it cleanly. No --repo-update
+        # needed; the cloud specs cache is fresh.
         script: |
           cd ios
-          RUBY33="$HOME/.rbenv/versions/3.3.0"
-          if [ ! -x "$RUBY33/bin/ruby" ]; then
-            export PATH="$HOME/.rbenv/bin:$PATH"
-            echo "Installing Ruby 3.3.0 (one-time)..."
-            rbenv install 3.3.0 || { echo "rbenv install failed"; exit 1; }
-          fi
-          export PATH="$RUBY33/bin:$PATH"
-          echo "Using Ruby $($RUBY33/bin/ruby -v)"
-          # Use Bundler to LOCK the toolchain. Simply `gem install xcodeproj -v 1.22.0`
-          # is not enough: when both 1.22.0 and the newer 1.28.1 are present, RubyGems
-          # loads the NEWEST, so pod still crashed on xcodeproj 1.28.1. A Gemfile forces 1.22.0.
-          #   - xcodeproj 1.22.0  : only version that parses our objectVersion 54 pbxproj
-          #                         (1.27/1.28 -> unknown ISA; 1.25.0 -> type-check regression)
-          #   - activesupport 7.0.8 : CocoaPods 1.13.0's #present? crashes on 7.1+
-          "$RUBY33/bin/gem" install bundler --no-document 2>&1 | tail -1
-          printf 'source "https://rubygems.org"\ngem "cocoapods", "1.13.0"\ngem "xcodeproj", "1.22.0"\ngem "activesupport", "7.0.8"\n' > Gemfile
-          "$RUBY33/bin/bundle" install 2>&1 | tail -6
-          echo "pod: $("$RUBY33/bin/bundle" exec pod --version)"
-          "$RUBY33/bin/bundle" exec pod install
+          pod install
 
       - name: Static analysis
         script: flutter analyze
